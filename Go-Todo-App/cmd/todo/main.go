@@ -26,28 +26,51 @@ ___________        .___        ____    .__          __
 
 	file, err := os.Open("tasks.json")
 	if err != nil {
-		fmt.Println("It seems that you dont have any tasks currently. To add a task, use the \"add task <task name> \" command!")
+		fmt.Print("It seems that you dont have any tasks currently. To continue, use one of the following commands: \n 1. add task <task name> \n 2. quit \n> ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		userInput := scanner.Text()
-		// check until add task has properly been written
-		for !(strings.Contains(userInput, "add task ")) {
-			fmt.Println("Invalid command. Please try again.")
+		// check until add task or quit has properly been written
+		for !(strings.Contains(userInput, "add task ")) && !(strings.EqualFold(userInput, "quit")) {
+			fmt.Print("Invalid command. Please try again.\n> ")
 			scanner.Scan()
 			userInput = scanner.Text()
 		}
-		createJson(userInput)
+		switch userInput {
+		case "quit":
+			fmt.Println("See you soon!")
+			defer file.Close()
+			return
+		default:
+			createJson(userInput)
+			file, err = os.Open("tasks.json")
+		}
 	} else {
-		fmt.Println("To continue, use one of the following commands: \n 1. add task <task name> \n 2. list tasks \n 3. quit")
+		fmt.Print("To continue, use one of the following commands: \n 1. add task <task name> \n 2. list tasks \n 3. complete <task name> \n 4. delete <task name> \n 5. quit\n> ")
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		userInput := scanner.Text()
-		for !(strings.Contains(userInput, "add task ")) {
-			fmt.Println("Invalid command. Please try again.")
+		// check until one of the commands is written correcty
+		for !(strings.Contains(userInput, "add task ")) && !(strings.EqualFold(userInput, "list tasks")) && !(strings.EqualFold(userInput, "quit")) && !(strings.Contains(userInput, "complete ")) && !(strings.Contains(userInput, "delete ")) {
+			fmt.Print("\nInvalid command. Please try again.\n> ")
 			scanner.Scan()
 			userInput = scanner.Text()
 		}
-		addTask(userInput)
+
+		// Different commands lead to different functions
+		if strings.EqualFold(userInput, "list tasks") {
+			loadTasks()
+		} else if strings.EqualFold(userInput, "quit") {
+			fmt.Println("\nSee you soon!")
+			defer file.Close()
+			return
+		} else if strings.Contains(userInput, "complete ") {
+			completeTasks(userInput)
+		} else if strings.Contains(userInput, "delete ") {
+			deleteTask(userInput)
+		} else {
+			addTask(userInput)
+		}
 	}
 	loop(*file, err)
 }
@@ -66,7 +89,7 @@ func createJson(task string) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Task Added!")
+	fmt.Println("\nTask Added!")
 }
 
 // function used for add tasks
@@ -100,9 +123,134 @@ func addTask(task string) {
 		panic(err)
 	}
 
-	fmt.Println("Task Added!")
+	fmt.Println("\nTask Added!")
+}
+
+// loads tasks from the json file
+func loadTasks() {
+	var tasks []Task
+	fileRead, err := os.ReadFile("tasks.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// decode the read json file
+	err = json.Unmarshal(fileRead, &tasks)
+	if err != nil {
+		panic(err)
+	}
+
+	// prints out tasks using [X] task_name order if completed and [ ] task_name if not completed
+	fmt.Println("\nList of all tasks: ")
+	for i := 0; i < len(tasks); i++ {
+		if tasks[i].Done {
+			fmt.Println("[X] " + tasks[i].Name)
+		} else {
+			fmt.Println("[ ] " + tasks[i].Name)
+		}
+	}
+}
+
+func completeTasks(task string) {
+	taskName := task[9:]
+	var tasks []Task
+
+	// read the json file
+	fileRead, err := os.ReadFile("tasks.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// decode the read json file
+	err = json.Unmarshal(fileRead, &tasks)
+	if err != nil {
+		panic(err)
+	}
+
+	for i := 0; i < len(tasks); i++ {
+		if strings.EqualFold(tasks[i].Name, taskName) {
+			tasks[i].Done = true
+			fmt.Println("\nTask Completed!")
+			b, erro := json.Marshal(tasks)
+			if erro != nil {
+				panic(erro)
+			}
+			err = os.WriteFile("tasks.json", b, 0644)
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
+	}
+
+	fmt.Println("\nTask doesn't exist.")
+}
+
+func deleteTask(task string) {
+	taskName := task[7:]
+
+	var tasks []Task
+	// read the json file
+	fileRead, err := os.ReadFile("tasks.json")
+	if err != nil {
+		panic(err)
+	}
+
+	// decode the read json file
+	err = json.Unmarshal(fileRead, &tasks)
+	if err != nil {
+		panic(err)
+	}
+
+	// decode the read json file
+	err = json.Unmarshal(fileRead, &tasks)
+	if err != nil {
+		panic(err)
+	}
+
+	for i := 0; i < len(tasks); i++ {
+		if strings.EqualFold(tasks[i].Name, taskName) {
+			tasks = append(tasks[:i], tasks[i+1:]...)
+			fmt.Println("\nTask Deleted!")
+			b, erro := json.Marshal(tasks)
+			if erro != nil {
+				panic(erro)
+			}
+			err = os.WriteFile("tasks.json", b, 0644)
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
+	}
+
+	fmt.Println("\nTask doesn't exist.")
 }
 
 func loop(file os.File, err error) {
-	fmt.Println("Entered Loop")
+	userInput := ""
+
+	for !strings.EqualFold(userInput, "quit") {
+		fmt.Print("\nWhat would you like to do? \n 1. add task <task name> \n 2. list tasks \n 3. complete <task name> \n 4. delete <task name> \n 5. quit\n> ")
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		userInput = scanner.Text()
+
+		if strings.Contains(userInput, "add task ") {
+			addTask(userInput)
+		} else if strings.EqualFold(userInput, "list tasks") {
+			loadTasks()
+		} else if strings.Contains(userInput, "complete ") {
+			completeTasks(userInput)
+		} else if strings.Contains(userInput, "delete ") {
+			deleteTask(userInput)
+		} else if strings.EqualFold(userInput, "quit") {
+			break
+		} else {
+			fmt.Println("Invalid command. ")
+		}
+	}
+
+	fmt.Print("See you soon!")
+	defer file.Close()
 }
